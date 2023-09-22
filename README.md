@@ -5,9 +5,9 @@
 Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 
-# Contract Developer Code Demo Repository
+# TLMS Contract Developer Code Demo 
 
-Welcome to the **contract-dev-code-demo** repository! This repo serves as a central location for storing all the code demos used in the lessons written for the [Contract Developer certification program](https://docs.google.com/spreadsheets/d/1-5tbm9YXFXJb-s4rUhyxdZkOrP5fuzhB90D0F7Q4E9I/edit#gid=1161341563). You can simply clone the repo and run the code to efficiently review the technical lessons. 
+Welcome to the **contract-dev-code-demo** repository! This repo serves as a central location for storing all the code demos used in the [Contract Developer certification program on TLMS.](https://daml.talentlms.com/dashboard/index/role:learner) 
 
 ## Repository Structure
 At the top level of the repository, you will find folders representing each [course](https://drive.google.com/drive/folders/1QkXu5MC0fTR-8tJfQcgQWQvJcr-yjZLF) within the Contract Developer certification program. For example, the `01-advanced-fundamentals` folder corresponds to the "Advanced Fundamentals" course.
