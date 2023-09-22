@@ -1,0 +1,93 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Delegation where
+import Daml.Script 
+
+template Iou
+    with
+        issuer: Party
+        owner: Party
+        discloseTo: Party
+    where
+        signatory issuer, owner
+        observer discloseTo
+
+        choice Transfer: ContractId TransferProposal
+            with
+                recipient: Party
+            controller owner
+            do
+                create TransferProposal with
+                    recipient
+                    iou = this
+
+
+template DelegationAgreement
+    with
+        principal: Party
+        agent: Party
+    where
+        signatory principal
+        observer agent
+        
+        -- nonconsuming choice DelegateTransfer: ContractId TransferProposal
+        choice DelegateTransfer: ContractId TransferProposal
+            with 
+                recipient: Party
+                iouCid: ContractId Iou
+            controller agent
+            do
+                exercise iouCid Transfer with
+                    recipient
+
+
+template TransferProposal
+    with
+        recipient: Party
+        iou: Iou
+    where
+        signatory iou.issuer, iou.owner
+        observer recipient
+
+        choice Accept: ContractId Iou
+            controller recipient
+            do
+                create iou with
+                    owner = recipient
+
+        choice Reject: ContractId Iou
+            controller recipient
+            do
+                create iou
+
+        choice Cancel: ContractId Iou
+            controller iou.owner
+            do
+                create iou
+
+
+
+test = script do
+    bank <- allocateParty "Bank" 
+    alice <- allocateParty "Alice" 
+    bob <- allocateParty "Bob" 
+
+    bobIouCid <- submit bob do
+        createCmd Iou with
+            issuer = bob
+            owner = bob
+            discloseTo = bank
+    
+    bankAgent <- submit bob do
+        createCmd DelegationAgreement with
+            principal = bob
+            agent = bank
+
+    bankToAlice <- submit bank do
+        exerciseCmd bankAgent DelegateTransfer with
+            recipient = alice
+            iouCid = bobIouCid
+
+    submit alice do
+        exerciseCmd bankToAlice Accept

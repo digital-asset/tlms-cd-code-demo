@@ -1,0 +1,67 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module RetrievingContracts where
+
+import Daml.Script
+
+
+template BankAccount
+    with
+        bank: Party
+        accountOwner: Party
+        balance: Decimal
+    where
+        signatory bank, accountOwner
+
+        choice ApplyInterest : ContractId BankAccount
+            controller bank
+            do
+                let
+                    newBalance = balance + (balance * 0.05)
+
+                create this with
+                    balance = newBalance
+
+
+
+testAction1 = script do
+    bank <- allocateParty "bank"
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+    charlie <- allocateParty "Charlie"
+   
+    submitMulti [alice, bank][] do
+        createCmd BankAccount with
+            bank
+            accountOwner = alice
+            balance = 100.0
+
+    submitMulti [bob, bank][] do
+        createCmd BankAccount with
+            bank
+            accountOwner = bob
+            balance = 100.0
+
+    submitMulti [charlie, bank][] do
+        createCmd BankAccount with
+            bank
+            accountOwner = charlie
+            balance = 100.0
+    
+    allAccounts <- query @BankAccount bank
+    debug $ allAccounts
+
+    -- debug $ map (\x -> show x) [1,2,3] 
+    -- map (\x -> debug x) [1,2,3]
+
+    -- -- # mapA example 1
+    -- mapADebug <- mapA (\x -> debug x) [1,2,3]
+    -- debug $ mapADebug
+
+    -- -- # mapA example 2
+    -- mapADebugAcc <- mapA (\x -> debug x) allAccounts 
+    -- debug $ mapADebugAcc
+
+    updatedAcc <- mapA (\x -> submit bank do exerciseCmd x._1 ApplyInterest) allAccounts
+    debug $ updatedAcc

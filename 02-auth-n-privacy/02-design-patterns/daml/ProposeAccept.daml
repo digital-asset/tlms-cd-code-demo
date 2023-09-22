@@ -1,0 +1,64 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module ProposeAccept where
+
+import Daml.Script 
+
+template Iou
+  with
+    issuer: Party
+    owner: Party
+  where
+    signatory issuer, owner
+
+    choice Transfer: ContractId TransferProposal
+      with
+        recipient: Party
+      controller owner
+      do
+        create TransferProposal with 
+          recipient
+          iou = this
+
+
+template TransferProposal
+  with
+    recipient: Party
+    iou: Iou
+  where
+    signatory iou.issuer, iou.owner 
+    observer recipient 
+    
+    choice Accept: ContractId Iou 
+      controller recipient
+      do
+        create iou with
+          owner = recipient 
+
+    choice Reject: ContractId Iou
+      controller recipient
+      do
+        create iou 
+
+    choice Cancel: ContractId Iou
+      controller iou.owner
+      do
+        create iou
+
+
+test = script do
+  alice <- allocateParty "Alice" 
+  bob <- allocateParty "Bob"
+
+  bobIou <- submit bob do
+    createCmd Iou with
+      issuer = bob
+      owner = bob
+
+  bobPropose <- submit bob do
+    exerciseCmd bobIou Transfer with
+      recipient = alice
+
+  submit alice do
+    exerciseCmd bobPropose Accept

@@ -1,0 +1,61 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module InformativeTypes where
+
+import Daml.Script 
+
+
+-- Either
+someFunction: Int -> Either Text Int
+someFunction x =
+   if (x < 0) then
+        Left "Error"
+   else Right (x + 2)
+
+
+testSF = script do
+    debug $ someFunction (-2)
+    debug $ someFunction 2
+
+
+
+
+
+
+-- Optional
+safeDiv : Int -> Int -> Optional Int
+safeDiv _ 0 = None
+safeDiv x y = Some (x / y)
+
+testSD = script do
+    debug $ safeDiv 6 0 
+    debug $ safeDiv 6 2 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

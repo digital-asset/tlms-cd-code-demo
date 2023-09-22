@@ -1,0 +1,57 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Preconsuming where
+
+import Daml.Script
+
+template SocialNetworkUser
+    with
+        username: Party
+        following: [Party]
+        alias: Text
+    where
+        signatory username
+        observer following
+
+        key username : Party 
+        maintainer key 
+
+        ensure alias /= ""
+
+        preconsuming choice Follow: ContractId SocialNetworkUser -- Update (ContractId SocialNetworkUser)
+            with
+                userToFollow: Party
+            controller username
+            do    
+                assertMsg "You cannot follow yourself" (userToFollow /= username)
+                assertMsg "You cannot follow the same user twice" (notElem userToFollow following)
+                
+                create this with following = userToFollow :: following
+
+
+        -- nonconsuming choice Follow: ContractId SocialNetworkUser
+        --     with
+        --         userToFollow: Party
+        --     controller username
+        --     do
+        --         archive self       
+        --         assertMsg "You cannot follow yourself" (userToFollow /= username)
+        --         assertMsg "You cannot follow the same user twice" (notElem userToFollow following)
+                
+        --         create this with following = userToFollow :: following
+
+
+test = script do 
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+
+    aliceCid <- submit alice do
+        createCmd SocialNetworkUser with
+            username = alice
+            following = []
+            alias = "test alias"
+
+    submit alice do
+        exerciseCmd aliceCid Follow with 
+            userToFollow = bob

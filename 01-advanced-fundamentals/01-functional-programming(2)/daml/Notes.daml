@@ -1,0 +1,53 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Notes where
+
+import Daml.Script
+
+
+data Confusing = Int
+    deriving (Eq, Show)
+
+testC = script do 
+    let 
+        c : Confusing 
+        c = Int
+    
+    debug $ c
+
+
+
+data Foo = Foo
+    deriving (Eq, Show)
+
+testF = script do 
+    let 
+        f : Foo 
+        f = Foo
+    
+    debug $ f
+
+
+
+data Foo = Foo {}
+    deriving (Eq, Show)
+
+testF = script do 
+    let 
+        f : Foo 
+        f = Foo
+    
+    debug $ f
+
+
+
+data Foo = Foo ()
+    deriving (Eq, Show)
+
+testF = script do 
+    let 
+        f : Foo 
+        f = Foo ()
+    
+    debug $ f

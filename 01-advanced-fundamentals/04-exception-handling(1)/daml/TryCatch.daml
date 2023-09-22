@@ -1,0 +1,97 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module TryCatch where
+
+import Daml.Script
+import DA.Exception
+
+
+template SocialNetworkUser
+    with
+        username: Party
+        following: [Party]
+        alias: Text
+    where
+        signatory username
+        observer following
+
+        key username : Party 
+        maintainer key 
+
+        ensure alias /= ""
+
+        choice Follow: ContractId SocialNetworkUser
+            with
+                userToFollow: Party
+            controller username
+            do       
+                assertMsg "You cannot follow yourself" (userToFollow /= username)
+                assertMsg "You cannot follow the same user twice" (notElem userToFollow following)
+                create this with following = userToFollow :: following
+
+        nonconsuming choice ChangeAlias: ContractId SocialNetworkUser
+            with
+                newAlias: Text
+            controller username
+            do
+                try do
+                    archive self
+                    create this with alias = newAlias 
+                catch
+                    (PreconditionFailed _) -> do
+                        -- pure self 
+                        trace "Alias cannot be an empty string. Try again." (pure self)
+
+
+        -- nonconsuming choice ChangeAlias: Either Text (ContractId SocialNetworkUser)
+        --     with
+        --         newAlias: Text
+        --     controller username
+        --     do
+        --         try do
+        --             archive self
+        --             cid <- create this with alias = newAlias 
+        --             let result = Right cid 
+        --             pure result
+        --         catch
+        --             (PreconditionFailed _) -> do
+        --                 let result = Left "Alias cannot be an empty string. Try again."
+        --                 pure result                        
+
+
+
+test = script do
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+
+    aliceCid <- submit alice do
+        createCmd SocialNetworkUser with
+            username = alice
+            following = []
+            alias = "aliceAlias"
+    
+    submit alice do 
+        exerciseCmd aliceCid ChangeAlias with newAlias = ""
+
+
+
+
+    -- submit alice do 
+    --     exerciseCmd aliceCid ChangeAlias with newAlias = "ExpertDamler"
+
+
+                    -- (PreconditionFailed _) -> do
+                    --     let result = Left "Alias cannot be an empty string. Try again."
+                    --     pure result
+
+                    -- (PreconditionFailed ea) -> do
+                    --     debug ea 
+                    --     let result = Left ea
+                    --     pure result
+
+
+                    -- (e : PreconditionFailed) -> do
+                    --     debug $ message e 
+                    --     let result = Left $ message e 
+                    --     pure result

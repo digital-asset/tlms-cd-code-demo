@@ -1,0 +1,29 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Setup where
+
+
+template SocialNetworkUser
+    with
+        username: Party
+        following: [Party]
+        alias: Text
+    where
+        signatory username
+        observer following
+
+        key username : Party 
+        maintainer key 
+
+        ensure alias /= ""
+
+        choice Follow: ContractId SocialNetworkUser
+            with
+                userToFollow: Party
+            controller username
+            do       
+                assertMsg "You cannot follow yourself" (userToFollow /= username)
+                assertMsg "You cannot follow the same user twice" (notElem userToFollow following)
+                create this with following = userToFollow :: following
+                

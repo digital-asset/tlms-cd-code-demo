@@ -1,0 +1,48 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Iteratives where
+
+import Daml.Script 
+
+
+-- Recursion
+factorial: Int -> Int
+factorial n = 
+   if (n < 2) then 1 
+   else n * factorial (n - 1)
+
+testFac = script do
+   debug $ factorial 5 -- 120
+
+
+-- "... recursion can only happen at the top level."
+-- subFactorial : Int -> Int
+-- subFactorial n =
+--    factorial' 1 n
+--    where
+--    factorial' acc n' =
+--       if n == 1
+--       then acc
+--       else factorial' (acc * n') $ n' - 1
+
+
+
+-- Map
+-- map : (a -> b) -> [a] -> [b]
+-- cf. fmap(<$>): generic version of map
+moduloUsingMap: [Int] -> Int -> [Int]
+moduloUsingMap x y = map (% y) x
+
+testMap = script do
+   debug $ moduloUsingMap [14, 15, 19, 20] 3  --[2,0,1,2]
+
+
+-- Fold
+-- foldl : (b -> a -> b) -> b -> [a] -> b
+-- cf. foldr: right associative version of foldl
+sumList: [Int] -> Int
+sumList x = foldl (+) 0 x
+
+testFolds = script do
+   debug $ sumList [1..4]   -- 10

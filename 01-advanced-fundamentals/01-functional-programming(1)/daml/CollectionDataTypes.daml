@@ -1,0 +1,68 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module CollectionDataTypes where
+
+import Daml.Script
+
+import DA.List (head, tail, last, sort)
+import DA.Tuple (fst3)
+import DA.Set as Set
+import DA.Map as Map
+
+
+-- List: any size, elements of the same type
+-- Built-Ins: head, tail, last, sort, init, reverse, take, elem, sum, product
+listTest = script do
+    let
+        fruitList = ["orange", "apple", "banana"]
+
+    debug $ fruitList -- ["orange","apple","banana"]
+    debug $ head fruitList -- "orange"
+    debug $ tail fruitList -- ["apple","banana"]
+    debug $ last fruitList -- "banana"
+    debug $ sort fruitList -- ["apple","banana","orange"]
+
+
+
+-- Tuple: fixed size (up to twenty), elements of different data types
+-- Built-Ins: fst, snd (two-tuples), fst3, snd3, thd3 (three-tuples), ._1, ._2, … (tuple with more than three elements)
+tupleTest = script do
+    let
+        twoTuple = ("abc", 123)
+        threeTuple = ("a", 456, True)
+        nTuple = (1, "hello", True, [3,4])
+
+    debug $ twoTuple -- ("abc",123)
+    debug $ threeTuple -- ("a",456,True)
+    debug $ nTuple -- (1,"hello",True,[3,4])
+    debug $ nTuple._1 -- 1
+    debug $ fst twoTuple -- "abc"
+    debug $ snd twoTuple -- 123
+    debug $ fst3 threeTuple -- "a"
+
+
+
+-- Set: unique elements of the same data type
+-- Built-Ins: size, member, fromList, insert
+setTest = script do
+    let
+        fruitSet: Set Text
+        fruitSet = Set.empty
+        fruitList = ["apple", "banana", "cherry", "apple"]
+        fruitSet = Set.fromList fruitList
+
+    debug $ fruitSet -- Set ["apple","banana","cherry"]
+
+
+
+-- Map: key-value pairs
+-- Built-Ins: size, lookup, fromList, insert
+mapTest = script do
+    let
+        wordMap: Map Int Text
+        wordMap = Map.empty
+        words = [(1, "apple"), (2, "banana")]
+        wordMap = Map.fromList words
+
+    debug $ wordMap -- Map [("a","apple"),("b","banana")]

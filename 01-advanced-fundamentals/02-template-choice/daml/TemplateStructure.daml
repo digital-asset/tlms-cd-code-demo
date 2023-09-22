@@ -1,0 +1,19 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module TemplateStructure where
+
+
+template SocialNetworkUser
+    with
+        username: Party
+        following: [Party]
+        alias: Text
+    where
+        signatory username
+        observer following
+
+        key username : Party 
+        maintainer key 
+
+        ensure alias /= ""

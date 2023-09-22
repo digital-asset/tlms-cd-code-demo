@@ -1,0 +1,93 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Modularizing where
+
+import Daml.Script
+
+
+template SocialNetworkUser
+    with
+        username: Party
+        following: [Party]
+        alias: Text
+    where
+        signatory username
+        observer following
+
+        key username : Party 
+        maintainer key 
+
+        ensure alias /= ""
+
+        choice Follow: ContractId SocialNetworkUser
+            with
+                userToFollow: Party
+            controller username
+            do       
+                assertMsg "You cannot follow yourself" (userToFollow /= username)
+                assertMsg "You cannot follow the same user twice" (notElem userToFollow following)
+                create this with following = userToFollow :: following
+
+
+data TestParties = TestParties with
+    alice: Party
+    bob: Party
+
+
+setupParties : Script TestParties
+setupParties = do
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+    return $ TestParties
+        with
+            alice = alice
+            bob = bob
+
+
+setupContract : Party -> Script (ContractId SocialNetworkUser)
+setupContract p = do
+    submit p do
+        createCmd SocialNetworkUser with
+            username = p 
+            following = []
+            alias = "defaultAlias"
+
+
+canFollow : Script (TestParties, ContractId SocialNetworkUser)
+canFollow = do
+    testParties <- setupParties
+
+    aliceCid <- setupContract testParties.alice
+
+    followedCid <- submit testParties.alice do
+        exerciseCmd aliceCid Follow with
+            userToFollow = testParties.bob
+
+    pure (testParties, followedCid)
+
+
+
+-- canFollow : Script (TestParties, ContractId SocialNetworkUser)
+-- canFollow = do
+--     testParties@TestParties{alice, bob} <- setupParties
+
+--     aliceCid <- setupContract alice
+
+--     followedCid <- submit alice do
+--         exerciseCmd aliceCid Follow with
+--             userToFollow = bob
+
+--     pure (testParties, followedCid)
+
+
+
+cannotViolateUniqueKey : Script ()
+cannotViolateUniqueKey = do
+    (testParties@TestParties{..}, followedCid) <- canFollow
+
+    submitMustFail alice do
+        createCmd SocialNetworkUser with
+            username = alice
+            following = []
+            alias = "uniqueKeyViolation"

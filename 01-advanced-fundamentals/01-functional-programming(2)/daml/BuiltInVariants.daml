@@ -1,0 +1,54 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module BuiltInVariants where
+
+import Daml.Script
+import Prelude hiding(Bool(True, False), Optional(None, Some))
+
+data Bool = True | False 
+    deriving (Eq,Show)
+
+testB = script do
+    let 
+        bln : Bool
+        bln = True 
+
+    debug $ bln
+
+
+data Optional a = None | Some a 
+    deriving (Eq,Show)
+
+
+testO = script do 
+    let 
+        os : Optional Int 
+        os = Some 0
+
+        on : Optional ()
+        on = None
+
+    debug $ os
+    debug $ on
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    

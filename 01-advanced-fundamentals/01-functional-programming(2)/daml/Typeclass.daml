@@ -1,0 +1,13 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Typeclass where
+
+import Daml.Script
+
+
+testTypeclass : Script ()
+testTypeclass = script do
+    debug $ show "hello"  -- Text is an instance of Show typeclass
+    debug $ "hello" == "hello"  -- Text is an instance of Eq typeclass
+

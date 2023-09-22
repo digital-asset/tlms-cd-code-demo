@@ -1,0 +1,42 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module SumVsProduct where
+
+
+data One = One
+
+-- One
+
+
+data Two
+    = Two_a
+    | Two_b
+
+-- Two_a, Two_b
+
+
+data Sum_One_Two
+    = A_One One
+    | A_Two Two    
+
+-- A_One One, A_Two Two_a, A_Two Two_b
+
+
+
+
+
+
+data Product_Two_Two = Product_Two_Two
+    with
+        side1 : Two
+        side2 : Two  
+        
+-- Product_Two_Two with side1 = Two_a; side2 = Two_a,
+-- Product_Two_Two with side1 = Two_a; side2 = Two_b,
+-- Product_Two_Two with side1 = Two_b; side2 = Two_a,
+-- Product_Two_Two with side1 = Two_b; side2 = Two_b
+
+
+
+

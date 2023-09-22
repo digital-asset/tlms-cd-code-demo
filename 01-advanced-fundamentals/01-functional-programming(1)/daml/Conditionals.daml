@@ -1,0 +1,75 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Conditionals where
+
+import Daml.Script 
+
+-- if-then-else
+oddOrEven: Int -> Text
+oddOrEven x =
+   if (x % 2 == 0) then "even"
+   else "odd"
+
+testOdd = script do
+   debug $ oddOrEven 3
+
+
+
+-- Guards
+classifyNumber: Int -> Text
+classifyNumber n 
+   | n > 0 && n % 2 == 0 = "positive and even"
+   | n > 0 && n % 2 /= 0 = "positive and odd"
+   | n < 0 && n % 2 == 0 = "negative and even"
+   | n < 0 && n % 2 /= 0 = "negative and odd"
+   | otherwise = "zero"
+
+testCN = script do 
+   debug $ classifyNumber (-23)
+
+boundClassifyNumber: Int -> Text
+boundClassifyNumber n 
+   | n > 0 && even = "positive and even"
+   | n > 0 && not even = "positive and odd"
+   | n < 0 && even = "negative and even"
+   | n < 0 && not even = "negative and odd"
+   | otherwise = "zero"
+   where even = n % 2 == 0
+
+testBCN = script do
+   debug $ boundClassifyNumber 23
+
+-- case-of (pattern matching)
+isEven : Int -> Text
+isEven x = case (x % 2) of
+   0 -> "even"
+   _ -> "not even" 
+
+testEven = script do
+   debug $ isEven 2
+   debug $ isEven 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

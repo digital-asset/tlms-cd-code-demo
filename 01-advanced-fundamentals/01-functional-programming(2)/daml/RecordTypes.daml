@@ -1,0 +1,26 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module RecordTypes where
+
+import Daml.Script
+
+-- data AlternativeCoordinate a b = AlternativeCoordinate a b
+
+data Coordinate a b = Coordinate {first: a; second: b}
+    deriving (Eq, Show)
+
+-- data Coordinate a b = Coordinate with
+--     first: a
+--     second: b
+--         deriving (Eq, Show)
+
+
+
+testC = script do 
+    let
+        cdn : Coordinate Int Int 
+        cdn = Coordinate 1 2
+
+    debug $ cdn
+

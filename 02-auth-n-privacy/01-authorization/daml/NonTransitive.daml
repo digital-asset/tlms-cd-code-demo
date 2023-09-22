@@ -1,0 +1,50 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module NonTransitive where
+
+import Daml.Script 
+
+template NonTransitive
+  with
+    sig : Party
+    obs : Party
+  where
+    signatory sig
+    observer obs
+
+    choice SwapSigAndObs: ContractId NonTransitive
+      controller sig
+      do
+        create NonTransitive with                       
+          sig = obs                               
+          obs = sig
+
+    choice ExerciseSwapOnOther: ContractId NonTransitive
+        with
+          other : ContractId NonTransitive
+      controller obs
+      do
+        exercise other SwapSigAndObs
+
+
+testNT = script do
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+
+    nt1 <- submit alice do
+        createCmd NonTransitive with
+            sig = alice
+            obs = bob
+
+    -- submit alice do
+    --   exerciseCmd nt1 SwapSigAndObs
+    
+    nt2 <- submit alice do
+        createCmd NonTransitive with
+            sig = alice
+            obs = bob
+
+    submit bob do
+        exerciseCmd nt1 ExerciseSwapOnOther with
+            other = nt2

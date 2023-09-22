@@ -1,0 +1,71 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module CustomTypeclass where
+
+import Daml.Script
+import DA.Text (sha256)
+
+data PersonalRecord = PersonalRecord with
+    name : Text
+    id : Int
+    -- func: Text -> Text
+        -- deriving (Show, Eq)
+
+instance Show PersonalRecord where
+    show PersonalRecord {name,id} = "PersonalRecord {name = " <> show name <> ", id = 123" <> show id <> "}"
+
+class Hashable i o where
+    hash : i -> o
+
+
+instance Hashable PersonalRecord Text where 
+    hash myRecord = sha256 (myRecord.name <> show(myRecord.id))
+
+
+-- test = script do
+--     let 
+--         someData = PersonalRecord with
+--             name = "Alice"
+--             id = 123
+
+--     debug $ someData
+
+
+test = script do
+    let 
+        someData = PersonalRecord with
+            name = "Alice"
+            id = 123
+    
+        hashedData : Text
+        hashedData = hash someData
+
+    debug $ someData
+    debug $ hashedData
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- instance Show PersonalRecord where
+--     show PersonalRecord {name,id} = "PersonalRecord {name = " <> show name <> ", id = 123" <> show id <> "}"
+--     -- show myRecord = "PersonalRecord {name = " <> show myRecord.name <> ", id = 123" <> show myRecord.id <> "}"
+--     -- show PersonalRecord{name,id} = "PersonalRecord {name = " <> show name <> ", id = 123" <> show id <> ", func = <function>}"
+
+

@@ -1,0 +1,21 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module LambdaInfix where
+
+import Daml.Script
+
+
+test_lambda = script do
+    debug $ (\n -> n + 1) 5
+
+
+addTwoNums: Int -> Int -> Int
+addTwoNums a b = a + b
+
+infixAdd: Int -> Int -> Int
+infixAdd x y = x `addTwoNums` y
+-- infixAdd x y = addTwoNums x y
+
+addTest = script do
+   debug $ (+) 2 3
