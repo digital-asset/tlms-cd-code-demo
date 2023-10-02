@@ -7,7 +7,9 @@ SPDX-License-Identifier: Apache-2.0
 
 # TLMS Contract Developer Code Demo 
 
-Welcome to the **contract-dev-code-demo** repository! This repo serves as a central location for storing all the code demos used in the [Contract Developer certification program on TLMS.](https://daml.talentlms.com/dashboard/index/role:learner) 
+Hi, Damlers! Welcome to the **tlms-cd-code-demo** repository -- a hub for all the code demonstrations featured in the [Contract Developer certification program on TLMS.](https://daml.talentlms.com/dashboard/index/role:learner) 
+
+This repository has been created to assist you in enhancing your comprehension of the technical lessons. We encourage you to clone this repository to gain deeper insights into the code demonstrations presented throughout the course.
 
 ## Repository Structure
 At the top level of the repository, you will find folders representing each course within the Contract Developer certification program. For example, the `01-advanced-fundamentals` folder corresponds to the "Advanced Fundamentals" course.
@@ -21,7 +23,7 @@ The daml directory within each lesson folder contains the code demos used for sp
 ![file-tree2](./img/file-tree2.png)
 
 ## Intentional Errors in Code Demos
-Please note that deliberate errors may be present in the code demos to highlight specific error scenarios to the audience. If you encounter errors in the code, please refer to the lesson slide and read the speaker's notes to confirm whether the error is intentional or not before making a pull request to fix it.
+Please note that deliberate errors may be present in the code demos to highlight specific error scenarios to the audience. If you encounter errors in the code, please refer to the corresponding video lesson on TLMS to confirm whether the error is intentional or not before making a pull request to fix it.
 
 ## Repository Updates
 This repository is regularly updated whenever there are updates to the code demos used in the lessons. You can stay up to date by pulling the latest changes from the repository.
