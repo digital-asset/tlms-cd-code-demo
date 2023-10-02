@@ -1,0 +1,77 @@
+module ExtensibleSwap.Assets where 
+
+import ExtensibleSwap.Interfaces
+
+template Cash 
+  with 
+    issuer: Party 
+    owner: Party 
+    obs: [Party]
+    quantity: Decimal 
+  where 
+    signatory [issuer, owner] 
+    observer obs 
+
+    interface instance IAsset for Cash where 
+      view = VAsset with 
+        assetType = "Cash"
+        .. 
+      setOwner newOwner = toInterface (this with owner = newOwner)
+      setObs newObs = toInterface (this with obs = newObs)
+      setQuantity newQuantity = toInterface (this with quantity = newQuantity)
+      transferTo newOwner = toInterface $ CashTransferProposal with cash = this; ..
+     
+-----------------------------------
+
+template CashTransferProposal 
+  with 
+    newOwner: Party 
+    cash: Cash 
+
+  where 
+    signatory (signatory cash)
+    observer newOwner 
+
+    interface instance ITransferProposal for CashTransferProposal where 
+      view = VTransferProposal with 
+        newOwner = newOwner 
+        vasset = view $ toInterface @IAsset cash 
+      asset = toInterface @IAsset cash
+
+
+---------------
+template Bond 
+  with 
+    issuer: Party 
+    owner: Party 
+    obs: [Party]
+    quantity: Decimal 
+  where 
+    signatory [issuer, owner] 
+    observer obs 
+
+    interface instance IAsset for Bond where 
+      view = VAsset with 
+        assetType = "Bond"
+        .. 
+      setOwner newOwner = toInterface (this with owner = newOwner)
+      setObs newObs = toInterface (this with obs = newObs)
+      setQuantity newQuantity = toInterface (this with quantity = newQuantity)
+      transferTo newOwner = toInterface $ BondTransferProposal with bond = this; ..
+    
+-----------------------------------
+
+template BondTransferProposal 
+  with 
+    newOwner: Party 
+    bond: Bond 
+
+  where 
+    signatory (signatory bond)
+    observer newOwner 
+
+    interface instance ITransferProposal for BondTransferProposal where 
+      view = VTransferProposal with 
+        newOwner = newOwner 
+        vasset = view $ toInterface @IAsset bond 
+      asset = toInterface @IAsset bond

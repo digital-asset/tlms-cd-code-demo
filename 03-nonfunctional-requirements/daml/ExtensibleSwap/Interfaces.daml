@@ -1,0 +1,58 @@
+module ExtensibleSwap.Interfaces where 
+
+------------------
+data VAsset = VAsset with 
+  issuer : Party 
+  owner : Party 
+  obs: [Party]
+  quantity: Decimal 
+  assetType: Text 
+    
+interface IAsset where 
+  viewtype VAsset 
+  setOwner: Party -> IAsset 
+  setObs: [Party] -> IAsset
+  setQuantity : Decimal -> IAsset
+  transferTo: Party -> ITransferProposal
+
+  choice ProposeTransfer: ContractId ITransferProposal
+    with 
+      newOwner: Party 
+    controller (view this).owner 
+    do 
+      create $ transferTo this newOwner     
+
+  choice Transfer: ContractId IAsset 
+    with 
+      newOwner: Party 
+    controller [(view this).owner, newOwner]
+    do 
+      create $ setOwner (setObs this []) newOwner
+
+  choice SetObservers: ContractId IAsset 
+    with 
+      newObs: [Party]
+    controller (view this).owner 
+    do 
+      create $ setObs this newObs 
+
+
+-----------------
+data VTransferProposal = VTransferProposal with 
+  vasset : VAsset 
+  newOwner: Party 
+
+interface ITransferProposal where 
+  viewtype VTransferProposal
+  asset: IAsset
+
+  choice AcceptTransfer: ContractId IAsset 
+    controller (view this).newOwner
+    do 
+      create $ setOwner (asset this) (view this).newOwner
+
+
+---------------
+
+
+        

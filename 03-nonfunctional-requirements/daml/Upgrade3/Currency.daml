@@ -1,0 +1,57 @@
+module Upgrade3.Currency where 
+
+template Position 
+    with 
+        issuer: Party 
+        owner: Party 
+        obs: [Party]
+        quantity: Decimal 
+        currency: Text 
+
+    where 
+        signatory [issuer, owner]
+        observer obs
+
+        ensure quantity > 0.0
+
+        choice ProposeTransfer : ContractId TransferProposal
+            with
+                newOwner : Party
+            controller owner
+            do
+                create TransferProposal with 
+                    position = this
+                    newOwner
+                    
+        choice Transfer : ContractId Position
+            with
+                newOwner : Party
+            controller [owner, newOwner]
+            do
+                create this with 
+                    owner = newOwner
+                    obs = []
+
+
+
+template TransferProposal
+  with
+    position : Position
+    newOwner : Party
+  where
+    signatory (signatory position)
+    observer newOwner::(observer position)
+
+    choice Accept : ContractId Position
+      controller newOwner
+      do
+        create position with
+          owner = newOwner
+          obs = []
+        
+
+
+    choice Cancel : ContractId Position
+      controller position.owner
+      do
+        create position    

@@ -1,0 +1,103 @@
+module ExtensibleSwap.SwapTestScripts where 
+
+import Daml.Script
+
+import ExtensibleSwap.Assets
+import ExtensibleSwap.Interfaces
+import ExtensibleSwap.Swap
+
+import DA.Action (replicateA_)
+import DA.Foldable (forA_)
+
+data TestParties = TestParties with
+  pBank : Party
+  pAlice : Party
+  pBob : Party
+
+initParties : Script TestParties
+initParties = do
+  let allocate t = allocatePartyWithHint t (PartyIdHint t)
+  pBank <- allocate "Bank"
+  pAlice <- allocate "Alice"
+  pBob <- allocate "Bob"
+
+  return (TestParties with ..)
+
+initAssets : Script TestParties
+initAssets = do
+  ps@TestParties{..} <- initParties
+
+  let 
+    cash = Cash with 
+      issuer = pBank
+      owner = pBank 
+      obs = []
+      quantity = 1.0
+
+  let 
+    bond = Bond with 
+      issuer = pBank
+      owner = pBank 
+      obs = []
+      quantity = 1.0
+
+  -- 5 cash of $1 for Alice
+  replicateA_ 5 $ submit pBank do
+    createCmd CashTransferProposal with
+       newOwner = pAlice
+       cash
+
+  -- 5 bond of $1 for Bob
+  replicateA_ 5 $ submit pBank do
+    createCmd BondTransferProposal with
+        newOwner = pBob
+        bond
+  
+      -- Accept all transfer proposals
+  aliceProposals <- query @CashTransferProposal pAlice 
+  submit pAlice do
+    forA_ aliceProposals (\proposal -> do 
+      exerciseCmd (toInterfaceContractId @ITransferProposal proposal._1) AcceptTransfer)
+
+  bobProposals <- query @BondTransferProposal pBob 
+  submit pBob do 
+    forA_ bobProposals (\proposal -> do 
+      exerciseCmd (toInterfaceContractId @ITransferProposal proposal._1) AcceptTransfer)
+
+  return (ps)
+
+testSwap : Script () 
+testSwap = do 
+
+  ps@TestParties{..} <- initAssets 
+
+  -- Alice gets one Cash asset to swap
+  (cid, cash)::_ <- query @Cash pAlice 
+
+  --Alice add Bob as an observer
+  cid <- submit pAlice do 
+    exerciseCmd (toInterfaceContractId @IAsset cid) SetObservers with newObs = [pBob]
+
+  --Prepare swap specs
+  let 
+    offerSpec = (pBank, "Cash", cash.quantity)
+    requestedSpec = (pBank, "Bond", cash.quantity) 
+
+  --Alice creates SwapProposal
+  swapProposalCid <- submit pAlice do 
+    createCmd AssetSwapProposal with 
+      requester = pAlice 
+      receiver = pBob 
+      offerSpec
+      requestedSpec
+      offerCid = toInterfaceContractId @IAsset cid 
+
+  --Bob gets a bond as per the spec  
+  (cid, _)::_ <- queryFilter @Bond pBob (\bond -> bond.owner == pBob && bond.quantity == requestedSpec._3)
+  
+  --Bob Settles the swap
+  submit pBob do 
+    exerciseCmd swapProposalCid Settle with requestedCid = toInterfaceContractId @IAsset cid
+
+
+  return ()

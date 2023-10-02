@@ -1,0 +1,32 @@
+module Upgrade2.AddObserversScript where 
+
+import Daml.Script
+import InitialState.Cash
+import InitialState.Scripts
+import Upgrade2.AdditionalRules
+import DA.Foldable (forA_)
+
+testSetObservers : Script ()
+testSetObservers = script do
+  (tps@TestParties{..}, tus@TestUsers{..}) <- initCash
+
+  -- Create a reader party and give access to Alice and Bob
+  pBankReader <- allocateParty "BankReader"
+  grantUserRights uAlice [CanReadAs pBankReader]
+  grantUserRights uBob [CanReadAs pBankReader]
+
+  -- Bank Issues the new rule
+  rules <- submitUser uBank do
+    createCmd AdditionalRules with
+      bank = pBank
+      bankReader = pBankReader
+
+  -- Alice can make Bob observer on all her positions
+  alicePositions <- query @Position pAlice
+  forA_ (alicePositions) (\(cid, _) -> do
+    submitUser uAlice do
+      exerciseCmd rules SetObservers with 
+        owner = pAlice
+        positionCid = cid
+        new_obs = [pBob]
+    )
