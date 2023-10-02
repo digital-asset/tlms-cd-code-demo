@@ -1,0 +1,17 @@
+module Upgrade1.KYCScript where 
+
+import Upgrade1.KYC
+import InitialState.Scripts
+import Daml.Script
+
+testKYC: Script() 
+testKYC = do 
+
+    (tps@TestParties{..}, tus@TestUsers{..}) <- initCash
+    submitUser uBank do 
+        createCmd KYC with 
+            bank = pBank 
+            counterParty = pAlice 
+            address = "Earth" 
+
+    return ()

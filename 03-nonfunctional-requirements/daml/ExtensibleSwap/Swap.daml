@@ -1,0 +1,26 @@
+module ExtensibleSwap.Swap where 
+
+import ExtensibleSwap.Interfaces 
+
+template AssetSwapProposal 
+  with 
+    requester: Party 
+    receiver: Party
+    -- Triples of issuer, assetType, quantity
+    offerSpec: (Party, Text, Decimal)
+    offerCid: ContractId IAsset 
+    requestedSpec: (Party, Text, Decimal) 
+
+  where 
+    signatory requester 
+    observer receiver 
+
+    choice Settle: () 
+      with 
+        requestedCid: ContractId IAsset 
+      controller receiver 
+      do 
+        exercise offerCid Transfer with newOwner = receiver 
+        exercise requestedCid Transfer with newOwner = requester
+
+        return ()

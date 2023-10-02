@@ -1,0 +1,46 @@
+module Upgrade3.CurrencyScript where 
+
+import InitialState.Cash as Old
+import InitialState.Scripts
+import UpgradePackage.UpgradeModule as UpgradeModule
+
+import Daml.Script
+import DA.Foldable (forA_)
+
+testUpgrade : Script ()
+testUpgrade = do
+  (tps@TestParties{..}, tus@TestUsers{..}) <- initCash
+
+  -- Bank proposes the upgrade to Alice
+  submitUser uBank do
+    createCmd UpgradeProposal with
+      bank = pBank
+      counterparty = pAlice
+
+  --Bank proposes the upgrade to Bob
+  submitUser uBank do
+    createCmd UpgradeProposal with
+      bank = pBank
+      counterparty = pBob
+    
+  -- Alice and Bob accept
+  [(pa, _)] <- query @UpgradeProposal pAlice
+  submitUser uAlice do exerciseCmd pa AcceptUpgrade
+  [(pb, _)] <- query @UpgradeProposal pBob
+  submitUser uBob do exerciseCmd pb AcceptUpgrade
+
+  -- Get all upgraders 
+  upgraders <- query @Upgrader pBank
+
+  --Get counterparties's old positions 
+  forA_ upgraders (\(upgraderCid, upgrader) -> do
+    oldPositions <- query @Old.Position upgrader.counterparty
+
+  --Extract list of old Position Cids   
+    let 
+      positionCids = map fst oldPositions
+
+    submit pBank do 
+        exerciseCmd upgraderCid RunUpgrade with 
+          ..
+    )

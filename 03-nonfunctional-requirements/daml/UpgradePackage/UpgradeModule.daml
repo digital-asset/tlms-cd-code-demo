@@ -1,0 +1,52 @@
+{-# LANGUAGE ApplicativeDo #-}
+
+module UpgradePackage.UpgradeModule where 
+
+import InitialState.Cash qualified as Old
+import Upgrade3.Currency
+
+import DA.Foldable (forA_)
+
+template UpgradeProposal
+  with
+    bank : Party
+    counterparty : Party
+  where
+    signatory bank
+    observer counterparty
+
+    choice AcceptUpgrade : ContractId Upgrader
+      controller counterparty
+      do
+        create Upgrader with ..
+
+
+template Upgrader
+  with
+      bank : Party
+      counterparty : Party
+    where
+      signatory bank, counterparty
+
+      nonconsuming choice RunUpgrade : ()
+        with
+          positionCids : [ContractId Old.Position]
+        controller bank
+        do
+            forA_ positionCids (\positionCid ->  do
+            Old.Position {..} <- fetch positionCid
+            archive positionCid
+            let 
+                newPosition = Position with 
+                    currency = "USD"
+                    ..
+            newTransferProposalCid <- create TransferProposal with
+              position = newPosition
+              newOwner = owner
+            
+            exercise newTransferProposalCid Accept
+            )
+
+          
+
+          

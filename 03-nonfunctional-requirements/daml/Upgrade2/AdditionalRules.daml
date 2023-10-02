@@ -1,0 +1,29 @@
+module Upgrade2.AdditionalRules where 
+
+import InitialState.Cash 
+import DA.Assert
+
+template AdditionalRules
+  with
+    bank : Party
+    bankReader : Party
+  where
+    signatory bank
+    observer bankReader
+
+    nonconsuming choice SetObservers : ContractId Position
+      with
+        owner : Party
+        positionCid : ContractId Position
+        new_obs : [Party]
+      controller owner
+      do
+        position <- fetch positionCid
+        owner === position.owner
+        bank === position.issuer
+
+        archive positionCid
+        create position with obs = new_obs
+
+
+        

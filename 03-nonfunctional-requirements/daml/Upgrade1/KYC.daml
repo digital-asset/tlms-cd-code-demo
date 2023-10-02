@@ -1,0 +1,11 @@
+module Upgrade1.KYC where 
+
+
+template KYC
+  with
+    bank : Party
+    counterParty : Party
+    address : Text
+  where
+    signatory bank
+    observer counterParty
