@@ -5,9 +5,9 @@
 Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 
-# TLMS Contract Developer Code Demo 
+# TLMS Contract Developer Code Demo
 
-Hi, Damlers! Welcome to the **tlms-cd-code-demo** repository -- a hub for all the code demonstrations featured in the [Contract Developer certification program on TLMS.](https://daml.talentlms.com/dashboard/index/role:learner) 
+Hi, Damlers! Welcome to the **tlms-cd-code-demo** repository -- a hub for all the code demonstrations featured in the [Contract Developer certification program on TLMS.](https://daml.talentlms.com/dashboard/index/role:learner)
 
 This repository has been created to assist you in enhancing your comprehension of the technical lessons. We encourage you to clone this repository to gain deeper insights into the code demonstrations presented throughout the course.
 
