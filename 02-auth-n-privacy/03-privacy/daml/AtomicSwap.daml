@@ -1,0 +1,112 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module AtomicSwap where
+
+data SplitResult = SplitResult with
+  splitAsset : ContractId Asset
+  remainder : ContractId Asset
+    deriving (Eq, Show)
+
+template Asset
+  with
+    issuer: Party
+    owner : Party
+    amount : Decimal
+    observers: [Party]
+  where
+    signatory issuer, owner
+    observer observers
+    ensure amount > 0.0 
+
+    choice Asset_Transfer: ContractId AssetTransferProposal 
+      with
+        recipient: Party
+      controller owner
+      do
+        create AssetTransferProposal with
+          asset = this with observers = []
+          recipient
+
+    choice Asset_Merge: ContractId Asset
+      with
+        otherAssetCid: ContractId Asset
+      controller owner
+      do
+        otherAsset <- fetch otherAssetCid
+
+        assertMsg "Merge failed: issuer does not match" (issuer == otherAsset.issuer)
+        assertMsg "Merge failed: owner does not match" (owner == otherAsset.owner)
+
+        archive otherAssetCid
+        create this with
+          amount = amount + otherAsset.amount
+
+    choice Asset_Split: SplitResult
+      with
+        splitAmount: Decimal
+      controller owner
+      do
+        splitAsset <- create this with
+          amount = splitAmount
+        remainder <- create this with
+          amount = amount - splitAmount
+        pure SplitResult with
+          splitAsset
+          remainder
+
+    choice Asset_SetObservers: ContractId Asset
+      with
+        newObservers: [Party]
+      controller owner
+      do
+        create this with
+          observers = newObservers
+
+template AssetTransferProposal
+  with
+    asset: Asset
+    recipient : Party
+  where
+    signatory (signatory asset) 
+    observer recipient
+    ensure asset.amount > 0.0
+
+    choice AssetTransferProposal_Accept: ContractId Asset
+      controller recipient
+      do
+        create asset with
+          owner = recipient
+
+    choice AssetTransferProposal_Reject: ContractId Asset
+      controller recipient
+      do
+        create asset
+
+template SwapProposal
+    with
+      initiator: Party
+      recipient: Party
+      offerCid: ContractId Asset
+      requestedAsset: Asset
+    where
+      signatory initiator
+      observer recipient
+
+      choice SwapProposal_Accept: ()
+        with
+          assetCid: ContractId Asset
+        controller recipient
+        do
+          asset <- fetch assetCid
+          assertMsg "Asset issuer does NOT match." (asset.issuer == requestedAsset.issuer) 
+          assertMsg "Asset amount does NOT match." (asset.amount == requestedAsset.amount)
+          assertMsg "Asset owner does NOT match." (asset.owner == requestedAsset.owner)
+
+          offerTransferProposal <- exercise offerCid Asset_Transfer with recipient 
+          requestedTransferProposal <- exercise assetCid Asset_Transfer with recipient = initiator
+          exercise offerTransferProposal AssetTransferProposal_Accept
+          exercise requestedTransferProposal AssetTransferProposal_Accept
+          pure()
+
+

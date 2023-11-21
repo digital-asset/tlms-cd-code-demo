@@ -1,0 +1,44 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Test_AccountBalance where
+
+import Setup
+import AccountBalance
+import Daml.Script 
+
+testAccountBalance = script do
+    (testParties@TestParties{..}) <- setupTestParties
+
+    ubAssetCid <- submit ub do
+      createCmd Asset with 
+        issuer = ub
+        owner = ub
+        amount = 1000.0
+
+    ubToAliceCid <- submit ub do
+      exerciseCmd ubAssetCid Asset_Transfer with
+        recipient = alice
+        transferAmount = 400.0
+
+    aliceAssetCid <- submit alice do
+      exerciseCmd ubToAliceCid AssetTransferProposal_Accept
+
+    Some (ubRemainingAssetCid, _) <- queryContractKey @Asset ub (ub, ub)
+    ubToBobCid <- submit ub do
+      exerciseCmd ubRemainingAssetCid Asset_Transfer with
+        recipient = bob
+        transferAmount = 100.0
+
+    submit bob do
+      exerciseCmd ubToBobCid AssetTransferProposal_Accept
+
+    aliceToBobCid <- submit alice do
+      exerciseCmd aliceAssetCid Asset_Transfer with
+        recipient = bob
+        transferAmount = 30.0
+    
+    bobAssetCid <- submit bob do
+      exerciseCmd aliceToBobCid AssetTransferProposal_Accept
+
+    pure (alice, bob, ub, bobAssetCid)

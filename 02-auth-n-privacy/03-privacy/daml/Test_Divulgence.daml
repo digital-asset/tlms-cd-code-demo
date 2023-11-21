@@ -1,0 +1,23 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Test_Divulgence where
+
+import Divulgence
+import Test_AccountBalance
+import Daml.Script 
+
+testDivulgence = script do
+  (alice, bob, ub, bobAssetCid) <- testAccountBalance
+
+  optAsset <- queryContractId alice bobAssetCid
+
+  debug optAsset 
+
+  divTestCid <- submit ub do
+    createCmd DivulgenceTest with owner = ub, witness = alice
+
+  bobDivulgedAsset <- submit alice do
+    exerciseCmd divTestCid FetchContract with assetCid = bobAssetCid    
+  
+  debug bobDivulgedAsset

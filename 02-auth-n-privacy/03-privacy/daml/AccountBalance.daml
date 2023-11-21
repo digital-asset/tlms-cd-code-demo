@@ -1,0 +1,61 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module AccountBalance where
+
+template Asset
+  with
+    issuer: Party
+    owner : Party
+    amount : Decimal
+  where
+    signatory issuer, owner
+    ensure amount > 0.0 
+
+    key (issuer, owner): (Party, Party) 
+    maintainer key._1
+
+    choice Asset_Transfer: ContractId AssetTransferProposal
+      with
+        recipient: Party
+        transferAmount: Decimal
+      controller owner
+      do
+        create this with amount = amount - transferAmount
+
+        create AssetTransferProposal with
+          amount = transferAmount
+          ..
+
+template AssetTransferProposal
+  with
+    issuer: Party
+    owner : Party
+    amount : Decimal
+    recipient : Party
+  where
+    signatory issuer, owner
+    observer recipient
+    ensure amount > 0.0
+
+    choice AssetTransferProposal_Accept: ContractId Asset
+      controller recipient
+      do
+        assetCid <- lookupByKey @Asset (issuer, recipient) 
+        case assetCid of
+            None -> create Asset with 
+                owner = recipient
+                ..
+            Some assetCid -> do 
+                asset <- fetch assetCid
+                archive assetCid
+                create Asset with
+                    owner = recipient
+                    amount = asset.amount + amount
+                    ..
+
+    choice AssetTransferProposal_Reject: ContractId AssetTransferProposal
+      controller recipient
+      do
+        create this with recipient = owner
+
