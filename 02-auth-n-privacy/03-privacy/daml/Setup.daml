@@ -1,0 +1,20 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Setup where
+import Daml.Script
+
+data TestParties = TestParties with
+    alice: Party
+    bob: Party
+    ub: Party
+    eb: Party
+
+setupTestParties = script do
+    alice <- allocateParty "Alice"
+    bob <- allocateParty "Bob"
+    ub <- allocateParty "US_Bank"
+    eb <- allocateParty "EU_Bank"
+
+    pure TestParties with ..
+

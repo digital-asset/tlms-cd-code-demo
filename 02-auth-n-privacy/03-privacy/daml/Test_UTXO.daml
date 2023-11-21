@@ -1,0 +1,54 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Test_UTXO where
+
+import Setup
+import UTXO
+import Daml.Script
+
+testUTXO = script do
+    (testParties@TestParties{..}) <- setupTestParties
+
+    ubAssetCid1 <- submit ub do
+      createCmd Asset with 
+        issuer = ub
+        owner = ub
+        amount = 700.0
+
+    ubAssetCid2 <- submit ub do
+      createCmd Asset with 
+        issuer = ub
+        owner = ub
+        amount = 300.0
+
+    mergedUbAssetCid <- submit ub do
+      exerciseCmd ubAssetCid1 Asset_Merge with
+        otherAssetCid = ubAssetCid2
+
+    splittedUbAssetRecord <- submit ub do
+      exerciseCmd mergedUbAssetCid Asset_Split with
+        splitAmount = 400.0
+
+    ubToAliceCid <- submit ub do
+      exerciseCmd splittedUbAssetRecord.splitAsset Asset_Transfer with
+        recipient = alice
+
+    aliceAssetCid <- submit alice do
+      exerciseCmd ubToAliceCid AssetTransferProposal_Accept
+
+    ubToBobCid <- submit ub do
+      exerciseCmd splittedUbAssetRecord.remainder Asset_Transfer with
+        recipient = bob
+
+    bobAssetCid <- submit bob do
+      exerciseCmd ubToBobCid AssetTransferProposal_Accept
+
+    aliceToBobCid <- submit alice do
+      exerciseCmd aliceAssetCid Asset_Transfer with
+        recipient = bob
+    
+    bobTotalAssetCid <- submit bob do
+      exerciseCmd aliceToBobCid AssetTransferProposal_Accept
+
+    pure (testParties, bobTotalAssetCid)

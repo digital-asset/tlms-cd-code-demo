@@ -1,0 +1,92 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module Test_AtomicSwap where
+
+import Setup
+import AtomicSwap
+import Daml.Script
+
+testAtomicSwap = script do
+  (testParties@TestParties{..}) <- setupTestParties
+
+  ubAssetCid1 <- submit ub do
+    createCmd Asset with 
+      issuer = ub
+      owner = ub
+      amount = 700.0
+      observers = []
+
+  ubAssetCid2 <- submit ub do
+    createCmd Asset with 
+      issuer = ub
+      owner = ub
+      amount = 300.0
+      observers = []
+
+  mergedUbAssetCid <- submit ub do
+    exerciseCmd ubAssetCid1 Asset_Merge with
+      otherAssetCid = ubAssetCid2
+
+  splittedUbAssetRecord <- submit ub do
+    exerciseCmd mergedUbAssetCid Asset_Split with
+      splitAmount = 400.0
+
+  ubToAliceCid <- submit ub do
+    exerciseCmd splittedUbAssetRecord.splitAsset Asset_Transfer with
+      recipient = alice
+
+  aliceAssetCid <- submit alice do
+    exerciseCmd ubToAliceCid AssetTransferProposal_Accept
+
+  ubToBobCid <- submit ub do
+    exerciseCmd splittedUbAssetRecord.remainder Asset_Transfer with
+      recipient = bob
+
+  bobAssetCid1 <- submit bob do
+    exerciseCmd ubToBobCid AssetTransferProposal_Accept
+
+  aliceToBobCid <- submit alice do
+    exerciseCmd aliceAssetCid Asset_Transfer with
+      recipient = bob
+  
+  bobAssetCid2 <- submit bob do
+    exerciseCmd aliceToBobCid AssetTransferProposal_Accept
+
+-- ===================================== ATOMIC SWAP TEST =====================================
+
+  ebAssetCid <- submit eb do
+    createCmd Asset with
+      issuer = eb
+      owner = eb
+      amount = 380.0
+      observers = []
+
+  ebToAliceCid <- submit eb do
+    exerciseCmd ebAssetCid Asset_Transfer with
+      recipient = alice
+
+  aliceEuroCid <- submit alice do
+    exerciseCmd ebToAliceCid AssetTransferProposal_Accept
+
+  aliceEuroWithObsCid <- submit alice do
+    exerciseCmd aliceEuroCid Asset_SetObservers with
+      newObservers = [bob]
+
+  aliceSwapBobCid <- submit alice do
+    createCmd SwapProposal with
+      initiator = alice
+      recipient = bob
+      offerCid = aliceEuroWithObsCid
+      requestedAsset = Asset with
+        issuer = ub
+        owner = bob
+        amount = 400.0
+        observers = []
+
+  submit bob do
+    exerciseCmd aliceSwapBobCid SwapProposal_Accept with
+      assetCid = bobAssetCid2
+
+  pure ()
+
