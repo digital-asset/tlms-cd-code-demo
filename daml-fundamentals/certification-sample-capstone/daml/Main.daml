@@ -1,0 +1,214 @@
+module Main where
+
+import DA.Time
+
+type ProjectProposalId = ContractId ProjectProposal
+type ProjectId = ContractId Project
+
+data ProjectInfo = ProjectInfo with
+    lead: Party
+    title: Text
+    details: Text
+    soloProject: Bool
+    participants: Either Party [Party] -- either 1 person or a group of people
+    budgetRequirement: Optional (Decimal) -- either the amount in USD or None
+    startDate: Date
+    endDate: Date
+        deriving (Show, Eq, Ord)
+
+class Duration i o where
+    getDuration : i -> o
+
+instance Duration ProjectInfo Int where
+    getDuration proj =
+        let
+            startT: Time
+            startT = time proj.startDate 09 00 00
+
+            endT: Time
+            endT = time proj.endDate 18 00 00
+
+            diffInRelTime: RelTime
+            diffInRelTime = subTime endT startT
+
+            diffInDays: Int
+            diffInDays = wholeDays diffInRelTime
+
+            diffInWeekDays = diffInDays - (diffInDays/7 * 2) + 1 -- account for weekdays
+        in 
+            diffInWeekDays
+
+
+template ProjectProposal
+    with
+        proposer: Party
+        projectInfo: ProjectInfo
+        evaluator: Party
+        note: Text
+    where
+        signatory proposer
+        observer evaluator
+        
+        key (proposer, projectInfo) : (Party, ProjectInfo)
+        maintainer key._1
+
+        ensure (projectInfo.startDate < projectInfo.endDate) -- endDate has to be later than startDate
+
+        -- simply returns the ContractId of the current contract without archiving anything; can be used as a reminder if the proposal doesn't get either Approved or Rejected for a while
+        nonconsuming choice Propose: ProjectProposalId
+            controller proposer
+            do
+                return self
+
+        -- evaluator can check the list of accomplishments of the proposer to see if this proposer is qualified/ready take on a new project
+        nonconsuming choice ProposerAccomplishments: ([Text])
+            with
+                accomplishments: [(ContractId Accomplishment, Accomplishment)]
+            controller evaluator
+            do
+                if null accomplishments then return ["N/A"]
+                else do
+                    -- 1. map ver.
+                    return $ map (\acc -> acc._2.project.projectInfo.title <> " : " <> acc._2.project.projectInfo.details) accomplishments
+                    
+                    -- 2. forA ver. (Avoid using "trace" in production code as it is not recommended.)
+                    -- forA accomplishments (\acc -> do
+                    --     let 
+                    --         accDetails = acc._2.project.projectInfo.title <> " : " <> acc._2.project.projectInfo.details
+                    --     trace(accDetails)(return accDetails))
+
+
+        -- evaluator can Reject the proposer with feedback
+        choice Reject: ProjectProposalId
+            with
+                feedback: Text
+            controller evaluator
+            do
+                create this with
+                    note = feedback
+
+        -- an example of preconsuming choice; can be a regular choice without the archive function
+        -- upon getting rejected, the original proposer can Revise the ProjectInfo to re-propose
+        nonconsuming choice Revise: ProjectProposalId
+            with
+                newProjectInfo: ProjectInfo
+                comment: Text
+            controller proposer
+            do
+                assertMsg ("Project info needs to be revised")(this.projectInfo /= newProjectInfo)
+                archive self
+                create this with
+                    projectInfo = newProjectInfo
+                    note = comment
+
+        -- proposer can cancle the proposal
+        choice Cancel: ()
+            controller proposer
+            do
+                return ()
+
+        -- evaluator can approve the ProjectProposal & create a Project contract
+        choice Approve: ProjectId
+            with
+                evaluationDate: Date -- when will the project get evaluated
+                evaluatorNote: Optional(Text)  
+            controller evaluator
+            do
+                assertMsg "Project should be evaluated after the deadline." (evaluationDate > projectInfo.endDate)
+                create Project with
+                    projectInfo
+                    duration = getDuration projectInfo
+                    evaluator
+                    evaluationDate
+                    evaluatorNote
+
+
+template Project
+    with
+        projectInfo: ProjectInfo
+        duration: Int
+        evaluator: Party
+        evaluationDate: Date
+        evaluatorNote: Optional(Text)
+    where
+        signatory evaluator, projectInfo.lead 
+
+        key (projectInfo.lead, projectInfo):(Party, ProjectInfo)
+        maintainer key._1
+
+        ensure evaluationDate > projectInfo.endDate
+
+        choice Evaluate: Either (ContractId Project) (ContractId Accomplishment)
+            with
+                todaysDate: Date
+                feedback: Optional(Text)
+                readyToPublish: Bool
+            controller evaluator
+            do
+                -- 1. if ver:
+                if readyToPublish then do
+                    newAcc <- create Accomplishment with
+                        project = this
+                        evaluator
+                    return (Right newAcc)
+                else do
+                    currProj <- create this with 
+                        evaluationDate = todaysDate
+                        evaluatorNote = feedback
+                    return (Left currProj)
+
+                -- 2. case ver:             
+                -- case readyToPublish of
+                --     False -> do
+                --         currProj <- create this with
+                --             evaluationDate = todaysDate
+                --             evaluatorNote = feedback
+                --         return (Left currProj)
+                --     True -> do
+                --         newAcc <- create Accomplishment with
+                --             project = this
+                --             evaluator
+                --         return (Right newAcc)
+
+        choice ChangeDates: ProjectId
+            with
+                newStartDate: Date
+                newEndDate: Date
+                newEvalDate: Date
+                comment: Optional(Text)
+            controller evaluator, projectInfo.lead
+            do
+                let
+                    newProjectInfo = ProjectInfo with
+                        lead = projectInfo.lead
+                        title = projectInfo.title
+                        details = projectInfo.details
+                        soloProject = projectInfo.soloProject
+                        participants = projectInfo.participants
+                        budgetRequirement = projectInfo.budgetRequirement
+                        startDate = newStartDate
+                        endDate = newEndDate
+
+                create this with
+                    projectInfo = newProjectInfo
+                    duration = getDuration newProjectInfo
+                    evaluationDate = newEvalDate
+                    evaluatorNote = comment
+
+        choice CancleProject: ()
+            controller evaluator, projectInfo.lead
+            do
+                return ()
+
+
+template Accomplishment
+    with
+        project: Project
+        evaluator: Party
+    where
+        -- 1. Ensure that the signatories of a Project contract is equal to that of Accomplishment contract
+        -- 2. Prevent Accomplishment contract from being created outside the Evaluate choice
+        signatory (signatory project)
+
+        key (project.projectInfo.lead, project.projectInfo) : (Party, ProjectInfo)
+        maintainer key._1

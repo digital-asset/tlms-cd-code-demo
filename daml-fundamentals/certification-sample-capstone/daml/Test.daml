@@ -1,0 +1,133 @@
+module Test where
+
+import Main
+import Setup
+import DA.Date
+import Daml.Script
+
+{-
+    Min 1 Full Scenario & Min 3 Happy Paths
+        + testCreateProjectProposal: proposer can create ProjectProposal contracts & evaluator can exercise can check "ProposerAccomplishments" to either "Reject" or "Approve"
+            1. proposer creates a ProjectProposal contract     
+        + testProjectProposal: proposer and evaluator can exercise ProposerAccomplishments, Reject, Revise
+            2. evaluator exercises ProposerAccomplishments to check proposer's past accomplishments and confrim if proposer is ready to take on a new responsibility
+            3. evaluator exercises Reject with a feedback: "Aim to finish it by the end of March"
+            4. proposer exercises Revise with an updated endDate (March 25, 2023)
+        + testCreateProject: evaluator can "Approve" to create a Project contract
+            5. evaluator exercises Approve - a Project contract is created
+        + testCreateAccomplishment: evaluator can "Evaluate" for proposer and evaluator to create an "Accomplishment" once a "Project" is completed
+            6. evaluator exercises Evaluate and decides that it's ready to be published - an Accomplishment contract is created
+
+    Min 3 Unhappy Paths
+        - cantCreateWrongDates: proposer cannot create a ProjectProposal contract if startDate > endDate
+        - cantApproveMyself: proposer cannot "Approve" their own proposal contract 
+        - cantCreateAccomplishment: proposer cannot create an Accomplishment contract out of a Project contract without evaluator's approval/authority
+-}
+
+-- + testCreateProjectProposal: proposer can create ProjectProposal contracts & evaluator can exercise "ProposerAccomplishments" to either "Reject" or "Approve"
+testCreateProjectProposal = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished) <- setupAccomplishments
+    -- 1. proposer creates a ProjectProposal contract
+    proposal3 <- submit proposer do
+        createCmd ProjectProposal with
+            proposer
+            projectInfo = projInfo3
+            evaluator
+            note = "Third proposal"
+    return (testParties, testProjectInfos, proj1Accomplished, proj2Accomplished, proposal3)
+
+-- + testProjectProposal: proposer and evaluator can exercise ProposerAccomplishments, Reject, Revise
+testProjectProposal = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished, proposal3) <- testCreateProjectProposal
+    proposerAccs <- query @Accomplishment proposer
+    -- 2. evaluator exercises ProposerAccomplishments to check proposer's past accomplishments and confrim if proposer is ready to take on a new responsibility
+    checkProposerAcc <- submit evaluator do
+        exerciseCmd proposal3 ProposerAccomplishments with
+            accomplishments = proposerAccs
+    -- debug checkProposerAcc
+    
+    -- 3. evaluator exercise Reject with a feedback: "Aim to finish it by the end of March"
+    rejectedProposal <- submit evaluator do
+        exerciseCmd proposal3 Reject with
+            feedback = "Aim to finish it by the end of March"
+
+    let
+        revisedProjectInfo = ProjectInfo with
+            lead = proposer
+            title = "Third project title"
+            details = "Fundamentals exam 30 problems"
+            soloProject = True
+            participants = Left proposer
+            budgetRequirement = None
+            startDate = date 2023 Feb 15
+            endDate = date 2023 Mar 25            
+    -- 4. proposer exercises Revise with an updated endDate (March 25, 2023)
+    revisedProposal <- submit proposer do
+        exerciseCmd rejectedProposal Revise with
+            newProjectInfo = revisedProjectInfo
+            comment = "endDate is updated to March 25."
+
+    return (testParties, testProjectInfos, proj1Accomplished, proj2Accomplished, revisedProposal)
+
+-- + testCreateProject: evaluator can "Approve" to create a Project contract
+testCreateProject = script do 
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished, revisedProposal) <- testProjectProposal
+    -- 5. evaluator exercises Approve - a Project contract is created
+    approvedProj <- submit evaluator do
+        exerciseCmd revisedProposal Approve with
+            evaluationDate = date 2023 Mar 26
+            evaluatorNote = Some "Approved. Looking forward to see your deliverable."
+    
+    return (testParties, testProjectInfos, proj1Accomplished, proj2Accomplished, approvedProj)
+
+-- + testCreateAccomplishment: evaluator can "Evaluate" for proposer and evaluator to create an "Accomplishment" once a "Project" is completed
+testCreateAccomplishment = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished, approvedProj) <- testCreateProject
+    -- 6. evaluator exercises Evaluate and decides that it's ready to be published - an Accomplishment contract is created
+    submit evaluator do
+        exerciseCmd approvedProj Evaluate with
+            todaysDate = date 2023 Mar 26
+            feedback = Some "Excellent"
+            readyToPublish = True
+
+-- - cantCreateWrongDates: proposer cannot create a ProjectProposal contract if startDate > endDate
+cantCreateWrongDates = script do
+    testParties@TestParties{..} <- setupTestParties
+
+    let
+        wrongdateProjectInfo = ProjectInfo with
+            lead = proposer
+            title = "Third project title"
+            details = "Fundamentals exam 30 problems"
+            soloProject = True
+            participants = Left proposer
+            budgetRequirement = None
+            startDate = date 2023 Apr 10
+            endDate = date 2023 Feb 15    
+
+    submitMustFail proposer do
+        createCmd ProjectProposal with
+            proposer
+            projectInfo = wrongdateProjectInfo
+            evaluator
+            note = "Third proposal"
+
+-- - cantApproveMyself: proposer cannot "Approve" their own proposal contract 
+cantApproveMyself = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished, revisedProposal) <- testProjectProposal
+    
+    submitMustFail proposer do
+        exerciseCmd revisedProposal Approve with
+            evaluationDate = date 2023 Mar 26
+            evaluatorNote = Some "Approved. Looking forward to see your deliverable."
+
+-- - cantCreateAccomplishment: proposer cannot create an Accomplishment contract out of a Project contract without evaluator's approval/authority
+cantCreateAccomplishment = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}, proj1Accomplished, proj2Accomplished, approvedProj) <- testCreateProject
+    
+    Some testProj <- queryContractId proposer approvedProj
+
+    submitMustFail proposer do
+        createCmd Accomplishment with
+            project = testProj
+            evaluator

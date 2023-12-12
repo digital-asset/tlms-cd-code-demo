@@ -1,0 +1,122 @@
+module Setup where
+
+import Main
+import DA.Date
+import Daml.Script
+
+data TestParties = TestParties with
+    evaluator: Party
+    proposer: Party
+
+setupTestParties = script do
+    -- 1. Allocate parties with the given display name
+    evaluator <- allocatePartyWithHint "Evaluator" (PartyIdHint "EVL")
+    proposer <- allocatePartyWithHint "Proposer" (PartyIdHint "PSR")
+
+    return TestParties with
+        evaluator
+        proposer
+
+setupUsers = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}) <- setupProjectInfos
+
+    -- 2. Construct user-ids from text
+    evalId <- validateUserId "Eval"   
+    aliceId <- validateUserId "Alice"
+    bobId <- validateUserId "Bob"
+
+    -- 3. Create users with the given rights 
+    createUser (User evalId (Some evaluator)) [CanActAs evaluator]  
+    createUser (User aliceId (Some proposer)) [CanActAs proposer]
+    createUser (User bobId (Some proposer)) [CanActAs proposer]
+
+    submit proposer do
+        createCmd ProjectProposal with
+            proposer
+            projectInfo = projInfo3
+            evaluator
+            note = "Third proposal"   
+
+
+data TestProjectInfos = TestProjectInfos with
+    projInfo1: ProjectInfo
+    projInfo2: ProjectInfo
+    projInfo3: ProjectInfo
+
+setupProjectInfos = script do
+    testParties@TestParties{..} <- setupTestParties
+
+    let
+        projInfo1 = ProjectInfo with
+            lead = proposer
+            title = "First project title"
+            details = "Fundamentals certification rubric"
+            soloProject = True
+            participants = Left proposer
+            budgetRequirement = None
+            startDate = date 2023 Jan 12
+            endDate = date 2023 Jan 13
+
+        projInfo2 = ProjectInfo with
+            lead = proposer
+            title = "Second project title"
+            details = "Fundamentals sample project"
+            soloProject = True
+            participants = Left proposer
+            budgetRequirement = None
+            startDate = date 2023 Jan 16
+            endDate = date 2023 Jan 17
+
+        projInfo3 = ProjectInfo with
+            lead = proposer
+            title = "Third project title"
+            details = "Fundamentals exam 30 problems"
+            soloProject = True
+            participants = Left proposer
+            budgetRequirement = None
+            startDate = date 2023 Feb 15
+            endDate = date 2023 Apr 10
+
+    return (testParties, TestProjectInfos with {projInfo1, projInfo2, projInfo3})
+
+
+setupAccomplishments = script do
+    (testParties@TestParties{..}, testProjectInfos@TestProjectInfos{..}) <- setupProjectInfos
+    
+    proposal1 <- submit proposer do
+        createCmd ProjectProposal with
+            proposer
+            projectInfo = projInfo1
+            evaluator
+            note = "First proposal"
+
+    proposal2 <- submit proposer do
+        createCmd ProjectProposal with
+            proposer
+            projectInfo = projInfo2
+            evaluator
+            note = "Second proposal"
+
+    proj1Approved <- submit evaluator do
+        exerciseCmd proposal1 Approve with
+            evaluationDate = date 2023 Feb 10
+            evaluatorNote = Some "Proposal 1 approved"
+
+    proj2Approved <- submit evaluator do
+        exerciseCmd proposal2 Approve with
+            evaluationDate = date 2023 Mar 10
+            evaluatorNote = None
+
+    proj1Accomplished <- submit evaluator do
+        exerciseCmd proj1Approved Evaluate with
+            todaysDate = date 2023 Feb 10
+            feedback = Some "Good"
+            readyToPublish = True
+
+    proj2Accomplished <- submit evaluator do
+        exerciseCmd proj2Approved Evaluate with
+            todaysDate = date 2023 Mar 10
+            feedback = None
+            readyToPublish = True
+
+    return (testParties, testProjectInfos, proj1Accomplished, proj2Accomplished)
