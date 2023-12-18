@@ -1,0 +1,13 @@
+sdk-version: 2.5.0
+name: DamlForgeApp
+source: daml
+init-script: Setup:setupUsers
+version: 0.0.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+exposed-modules:
+  - Main
+# Note that all modules of package foo that should be available as imports of other packages need to be exposed by adding them to the exposed-modules stanza of the daml.yaml file. If the exposed-modules stanza is omitted, all modules of the project are exposed by default.
+# https://docs.daml.com/0.13.38/daml/reference/packages.html#importing-daml-archives
