@@ -1,0 +1,76 @@
+-- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All Rights Reserved. 
+-- SPDX-License-Identifier: Apache-2.0
+
+module SwapMarket.Tests.TestMarket where
+
+import Daml.Script
+import DA.Assert
+import DA.Time
+
+import SwapMarket.Market
+import SwapMarket.CardIssuance
+import SwapMarket.Tests.TestCardIssuance
+
+-- | If you examine the results of this test in the IDE you can confirm that Issuer A never learns of Card B and
+--   similarly, Issuer B never learns of Card A. This is despite both transfers occuring within a single transaction.
+--   This sub-transaction privacy is a critical capability when running multi-party workflows.
+testSwap : Script ()
+testSwap = do
+  DefaultMarketSetup with .. <- runDefaultMarketSetup
+  let DefaultCardSetup with .. = cardSetup
+
+  -- Alice creates a card offer.
+  now <- getTime
+  aliceOfferId <- submit alice $ exerciseCmd aliceInstallId MarketAppInstall_OfferCard with
+    offeredCardDetails = aliceCard.cardDetails
+    expiresAt = addRelTime now (days 1)
+    minProposalDuration = minutes 15
+  
+  -- Bob learns via market operator of the offer, and makes a proposal.
+  -- We use submitMulti to simulate the submission via explicit disclosure using a direct read from the provider.
+  proposalId <- submitMulti [bob] [provider] $ exerciseCmd aliceOfferId CardOffer_ProposeSwap with
+    proposer = bob
+    proposerMarketId = bobInstallId
+    proposedCardId = bobCardId
+    proposalExpiresAt = addRelTime now (hours 1)
+
+
+  -- Half an hour passes until alice is ready to accept the proposal.
+  passTime (minutes 30)
+  swapResult <- submit alice $ exerciseCmd proposalId SwapProposal_Accept with
+    offeredCardId = aliceCardId
+
+  -- Alice and Bob each have the other ones card
+  aliceCards <- query @Card alice
+  map (._2.cardDetails) aliceCards === [bobCard.cardDetails]
+
+  bobCards <- query @Card bob
+  map (._2.cardDetails) bobCards === [aliceCard.cardDetails]
+  pure ()
+
+-- In production we would also need to see negative tests to verify validations and authorization requirements are met.
+-- We would also test other alternatives to the happy path (such as Cancel and Withdraw or Expire).
+
+
+-- utitlies
+-----------
+
+data DefaultMarketSetup = DefaultMarketSetup with
+    cardSetup : DefaultCardSetup
+    provider : Party
+    aliceInstallId : ContractId MarketAppInstall
+    bobInstallId : ContractId MarketAppInstall
+    
+runDefaultMarketSetup : Script DefaultMarketSetup
+runDefaultMarketSetup = do
+  cardSetup@DefaultCardSetup with .. <- runDefaultCardSetup
+  provider <- allocateParty "Market Provider"
+  aliceInstallId <- joinMarket provider alice
+  bobInstallId <- joinMarket provider bob
+  pure DefaultMarketSetup with ..
+
+joinMarket : Party -> Party -> Script (ContractId MarketAppInstall)
+joinMarket provider user = do
+  requestId <- submit user $ createCmd MarketAppInstallRequest with provider; user
+  submit provider $ exerciseCmd requestId MarketAppInstallRequest_Accept
+ 
