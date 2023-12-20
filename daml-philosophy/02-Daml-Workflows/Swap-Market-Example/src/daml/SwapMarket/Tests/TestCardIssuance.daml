@@ -1,0 +1,150 @@
+module SwapMarket.Tests.TestCardIssuance where
+
+import DA.Assert
+import DA.List
+import DA.Time
+
+import Daml.Script
+
+import SwapMarket.CardIssuance
+
+-- | Convenience data type to caputure the allocated setup data
+data DefaultCardSetup = DefaultCardSetup with
+  issuerA : Party
+  issuerB : Party
+  alice : Party
+  bob : Party
+  aliceCard : Card
+  aliceCardId : ContractId Card
+  bobCard : Card
+  bobCardId : ContractId Card
+
+
+runDefaultCardSetup : Script DefaultCardSetup 
+runDefaultCardSetup = do
+  issuerA <- allocateParty "Issuer A"
+  issuerB <- allocateParty "Issuer B"
+  
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+
+  let aliceCard = Card with
+        cardDetails = CardDetails with
+          details = "Alpha Black Lotus"
+          issuer = issuerA
+        owner = alice
+  aliceCardId <- issueCard aliceCard
+
+  let bobCard = Card with
+        cardDetails = CardDetails with
+          details = "Pikachu Illustrator"
+          issuer = issuerB
+        owner = bob
+  bobCardId <- issueCard bobCard
+
+  pure DefaultCardSetup with ..
+
+testTransfer : Script ()
+testTransfer = do
+  DefaultCardSetup with .. <- runDefaultCardSetup
+
+  -- Alice and Bob both have one card each
+  aliceCards <- query @Card alice
+  length aliceCards === 1
+
+  bobCards <- query @Card bob
+  length bobCards === 1
+
+  -- Transfer Alice's card
+  newBobCardId <- submitMulti [alice, bob] [] $ exerciseCmd aliceCardId Card_Transfer with newOwner = bob
+
+  -- Alice has no more cards
+  aliceCardsNew <- query @Card alice
+  length aliceCardsNew === 0
+
+  -- Bob has exactly the cards of Alice and Bob
+  bobCardsNew <- query @Card bob
+  sort (map (._2.cardDetails) bobCardsNew) === 
+    sort (map (._2.cardDetails) (aliceCards ++ bobCards))
+
+
+setupLockedCard : Script (Party, ContractId LockedCard, DefaultCardSetup)
+setupLockedCard = do
+  setup@DefaultCardSetup with .. <- runDefaultCardSetup
+  charlie <- allocateParty "Charlie"
+
+  -- Lock Alice's card
+  now <- getTime
+  let lockCmd = exerciseCmd aliceCardId Card_Lock with 
+        lock = TimeLock with
+          holders = [bob, charlie]
+          expiresAt = now `addRelTime` (minutes 5)
+
+  -- Locking requires authorization from the owner and lock holder
+  submitMultiMustFail [alice] [] lockCmd 
+  submitMultiMustFail [bob] [] lockCmd 
+  submitMultiMustFail [charlie] [] lockCmd 
+  submitMultiMustFail [alice, bob] [] lockCmd 
+  submitMultiMustFail [alice, charlie] [] lockCmd 
+  submitMultiMustFail [bob, charlie] [] lockCmd 
+  lockedCardId <- submitMulti [alice, bob, charlie] [] lockCmd 
+
+  -- Alice's card is gone
+  None <- queryContractId alice aliceCardId
+
+  pure (charlie, lockedCardId, setup)
+
+testLockUnlock : Script ()
+testLockUnlock = do
+  (charlie, lockedCardId, DefaultCardSetup with ..) <- setupLockedCard
+
+  -- Unlocking requires authorization from the lock holders
+  let unlockCmd = exerciseCmd lockedCardId LockedCard_Unlock
+  submitMultiMustFail [alice] [] unlockCmd 
+  submitMultiMustFail [bob] [] unlockCmd 
+  submitMultiMustFail [charlie] [] unlockCmd 
+  aliceCardId <- submitMulti [bob, charlie] [] unlockCmd
+
+  -- And back
+  Some aliceNewCard <- queryContractId alice aliceCardId
+  aliceNewCard === aliceCard
+
+  pure ()
+
+testLockExpiryAsOwner : Script ()
+testLockExpiryAsOwner = do
+  (charlie, lockedCardId, DefaultCardSetup with ..) <- setupLockedCard
+
+  -- Expiry does not work right now ...
+  submitMustFail alice $ exerciseCmd lockedCardId LockedCard_LockExpire with actor = alice 
+
+  -- ... but it does after 5 mins
+  passTime (minutes 5)
+  submit alice $ exerciseCmd lockedCardId LockedCard_LockExpire with actor = alice 
+
+  pure ()
+
+
+testLock_ExpiryAsLockholder : Script ()
+testLock_ExpiryAsLockholder = do
+  (charlie, lockedCardId, DefaultCardSetup with ..) <- setupLockedCard
+
+  -- Expiry does not work right now ...
+  submitMustFail charlie $ exerciseCmd lockedCardId LockedCard_LockExpire with actor = charlie 
+
+  -- ... but it does after 5 mins
+  passTime (minutes 5)
+  submit charlie $ exerciseCmd lockedCardId LockedCard_LockExpire with actor = charlie 
+
+  pure ()
+
+
+-- Utitlies
+-----------
+
+issueCard : Card -> Script (ContractId Card)
+issueCard card = do
+  cardProposalId <- submit card.cardDetails.issuer $ createCmd IssueCardProposal with
+    cardDetails = card.cardDetails
+    owner = card.owner
+  submit card.owner $ exerciseCmd cardProposalId IssueCardProposal_Accept

@@ -1,0 +1,74 @@
+-- | A simple model of tokenized trading cards.
+module SwapMarket.CardIssuance where
+
+data CardDetails = CardDetails with
+    issuer : Party
+    details : Text
+  deriving (Show, Eq, Ord)
+
+-- | Utility contract to propose a card issuance to an owner.
+--   Note: This contract is the minimal scaffolding to create a card on the ledger. It is missing all the validation,
+--         cancellation, and rejection logic we would expect to see if we did an analysis of the "issue card" workflow.
+template IssueCardProposal
+  with
+    cardDetails : CardDetails -- ^ Details of a new card being issued
+    owner : Party             -- ^ Proposed owner of the new card
+  where
+    signatory cardDetails.issuer
+    observer owner
+    
+    choice IssueCardProposal_Accept : ContractId Card
+      controller owner
+      do
+        create Card with owner; cardDetails
+
+-- | A lock held by multiple parties until its expiry.
+data TimeLock = TimeLock with
+    holders : [Party]
+    expiresAt : Time
+  deriving (Eq, Show)
+
+-- | A tokenized card that can be transferred and locked.
+template Card
+  with
+    owner : Party             -- ^ Owner of the card
+    cardDetails : CardDetails -- ^ Details of the card
+  where
+    signatory owner, cardDetails.issuer
+
+    choice Card_Transfer : ContractId Card
+      with
+        newOwner : Party  -- ^ New owner
+      controller owner, newOwner
+      do
+        create this with owner = newOwner
+    
+    choice Card_Lock : ContractId LockedCard
+      with
+        lock: TimeLock  -- ^ Details of the requested lock
+      controller owner, lock.holders
+      do
+        create LockedCard with card = this; lock 
+
+-- | A card locked to the control of a set of lock holders for a specific amount of time.
+template LockedCard
+  with
+    card : Card     -- ^ Details of the locked card
+    lock : TimeLock -- ^ Details of the lock
+  where
+    signatory lock.holders, signatory card
+    
+    choice LockedCard_Unlock : ContractId Card
+      controller lock.holders
+      do
+        create card
+    
+    choice LockedCard_LockExpire : ContractId Card
+      with
+        actor: Party  -- ^ Any stakeholder of this contract
+      controller actor
+      do
+        now <- getTime
+        assertMsg "Actor is stakeholder" (actor `elem` stakeholder this)
+        assertMsg "Lock expired" (lock.expiresAt <= now)
+        create card
